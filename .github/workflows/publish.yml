@@ -18,26 +18,16 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - name: Download verified v031 assets
+      - name: Unpack verified standalone viewer
         run: |
-          python3 - <<'PY'
-          import json, hashlib, urllib.request
+          python3 - <<'PYCODE'
+          import io, zipfile, hashlib
           from pathlib import Path
-          from concurrent.futures import ThreadPoolExecutor
-          manifest = json.loads(Path('asset-manifest.json').read_text())
-          base = 'https://camry-chassis-inspector-v015.theservicema-7423.chatgpt.site/'
-          def download(item):
-              name, expected = item
-              data = urllib.request.urlopen(base + name, timeout=90).read()
-              assert hashlib.sha256(data).hexdigest() == expected, 'Asset changed: ' + name
-              target = Path('_site') / name
-              target.parent.mkdir(parents=True, exist_ok=True)
-              target.write_bytes(data)
-          with ThreadPoolExecutor(max_workers=6) as pool:
-              list(pool.map(download, manifest.items()))
-          Path('_site/.nojekyll').write_text('')
-          print('Verified', len(manifest), 'assets')
-          PY
+          data = b''.join(p.read_bytes() for p in sorted(Path('.').glob('viewer.zip.[0-9][0-9][0-9]')))
+          assert hashlib.sha256(data).hexdigest() == Path('archive.sha256').read_text().strip()
+          with zipfile.ZipFile(io.BytesIO(data)) as archive:
+              archive.extractall('_site')
+          PYCODE
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
