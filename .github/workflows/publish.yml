@@ -27,6 +27,8 @@ jobs:
           assert hashlib.sha256(data).hexdigest() == Path('archive.sha256').read_text().strip()
           with zipfile.ZipFile(io.BytesIO(data)) as archive:
               archive.extractall('_site')
+          for name in ['index.html', 'style.css', 'viewer.js']:
+              Path('_site', name).write_bytes(Path(name).read_bytes())
           PYCODE
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
