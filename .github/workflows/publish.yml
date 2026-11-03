@@ -1,0 +1,47 @@
+name: Publish car viewer
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download verified v031 assets
+        run: |
+          python3 - <<'PY'
+          import json, hashlib, urllib.request
+          from pathlib import Path
+          from concurrent.futures import ThreadPoolExecutor
+          manifest = json.loads(Path('asset-manifest.json').read_text())
+          base = 'https://camry-chassis-inspector-v015.theservicema-7423.chatgpt.site/'
+          def download(item):
+              name, expected = item
+              data = urllib.request.urlopen(base + name, timeout=90).read()
+              assert hashlib.sha256(data).hexdigest() == expected, 'Asset changed: ' + name
+              target = Path('_site') / name
+              target.parent.mkdir(parents=True, exist_ok=True)
+              target.write_bytes(data)
+          with ThreadPoolExecutor(max_workers=6) as pool:
+              list(pool.map(download, manifest.items()))
+          Path('_site/.nojekyll').write_text('')
+          print('Verified', len(manifest), 'assets')
+          PY
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
